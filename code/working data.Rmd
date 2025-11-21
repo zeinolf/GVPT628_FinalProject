@@ -1,0 +1,38 @@
+---
+title: "GVPT628 Final Project working"
+author: "Zach Einolf"
+date: "2025-11-21"
+output: pdf_document
+---
+
+```{r setup, include=FALSE, tidy=TRUE}
+knitr::opts_chunk$set(echo = TRUE,cache=TRUE, 
+                      autodep=TRUE, cache.comments=FALSE,
+                      message=FALSE, warning=FALSE,
+                      fig.width=4.5, fig.height=3.5)
+```
+
+
+
+```{r, echo=FALSE} 
+library(faraway)
+library(ISLR2)
+library(mgcv)
+library(leaps)
+library(janitor)
+library(sandwich)
+library(lmtest)
+library(ggplot2)
+library(tidyr)
+library(car)       
+library(ROCR)      
+library(pROC)  
+library(doBy)
+library(dplyr)
+library(tidyverse)
+library(haven)
+```
+
+```{r}
+data <- read_dta("../data/WVS_Wave_7_Philippines_Stata_v5.1.dta")
+```
