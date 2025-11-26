@@ -1,0 +1,321 @@
+```{r}
+library(readr)
+library(dplyr)
+library(tidyverse)
+library(cluster)
+library(factoextra)
+library(ggplot2)
+library(haven)
+library(doBy)
+library(tidyr)
+library(acled.api)
+library(httr)
+library(httr2)
+```
+
+```{r}
+w5<-read_dta("../data/ABS Wave 5 Philippines_Core_merged_20201223_release.dta")
+w6<-read_dta("../data/W6_Philippines_release_20240403.dta")
+```
+
+
+```{r}
+sw5 <- w5|>
+  select(IDnumber, Year, Q174, Q177, Q178, Q179, Q180, Q181, Q182, Q128, Q185, Q156, Q156a, Q158, Q106, Q106a, Q106b)
+
+clean_w5 <- sw5|>
+  mutate(
+    wave = 5,
+    idnumber = IDnumber,
+    year = Year,
+    asia_influence = Q174,
+    china_harm = Q177,
+    asia_future_inf = Q179,
+    model_development = Q180,
+    china_deg_inf = Q181,
+    china_inf_op = Q182,
+    china_world_inf = case_when(
+      Q178 %in% 1:2 ~ 1,
+      Q178 %in% 3:4 ~ 2,
+      Q178 == 5 ~ 3,
+      Q178 == 6 ~ 4,
+      Q178 %in% 7:8 ~ 5,
+      Q178 %in% 9:10 ~ 6,
+      Q178 == 97 ~ 7,
+      Q178 == 98 ~ 8,
+      Q178 == 99 ~ 9,
+      TRUE ~ NA_real_
+),
+  china_dem = Q128,
+  aspect_power = Q185,
+  way_of_life = Q156,
+  foreign_immigration = Q158,
+  country_problem1 = Q106,
+  country_problem2 = Q106a,
+  country_problem3 = Q106b,
+)|>
+select(wave,
+       idnumber,
+       year,
+       asia_influence,
+       china_harm,
+       china_world_inf,
+       asia_future_inf,
+       model_development,
+       china_deg_inf,
+       china_inf_op,
+       china_world_inf,
+       china_dem,
+       aspect_power,
+       way_of_life,
+       foreign_immigration,
+       country_problem1,
+       country_problem2,
+       country_problem3)
+
+
+sw6 <- w6|>
+  select(idnumber, year, Q173, Q176, Q177, Q179, Q180, Q181, Q182, Q120, Q185, Q156, Q158, Q97, Q97a, Q97b)
+
+clean_w6 <- sw6|>
+  mutate(
+    wave = 6,
+    idnumber = idnumber,
+    year = year,
+    asia_influence = Q173,
+    china_harm = Q176,
+    china_world_inf = Q177,
+    asia_future_inf = Q179,
+    model_development = Q180,
+    china_deg_inf = Q181,
+    china_inf_op = Q182,
+    china_world_inf = case_when(
+      Q177 %in% 1:2 ~ 6,
+      Q177 %in% 3:4 ~ 5,
+      Q177 == 5 ~ 4,
+      Q177 == 6 ~ 3,
+      Q177 %in% 7:8 ~ 2,
+      Q177 %in% 9:10 ~ 1,
+      Q177 == 97 ~ 7,
+      Q177 == 98 ~ 8,
+      Q177 == 99 ~ 9,
+      TRUE ~ NA_real_
+),
+  china_dem = Q120,
+  aspect_power = Q185,
+  way_of_life = Q156,
+  foreign_immigration = Q158,
+  country_problem1 = Q97,
+  country_problem2 = Q97a,
+  country_problem3 = Q97b,
+)|>
+select(wave,
+       idnumber,
+       year,
+       asia_influence,
+       china_harm,
+       china_world_inf,
+       asia_future_inf,
+       model_development,
+       china_deg_inf,
+       china_inf_op,
+       china_world_inf,
+       china_dem,
+       aspect_power,
+       way_of_life,
+       foreign_immigration,
+       country_problem1,
+       country_problem2,
+       country_problem3)
+
+
+comb_data <- bind_rows(clean_w5, clean_w6) |>
+arrange(year, wave, idnumber)
+
+comb_data <- comb_data |>
+  mutate(
+    across(
+      c(
+        asia_influence, china_harm, china_world_inf, china_deg_inf, china_inf_op, aspect_power, way_of_life, foreign_immigration
+        ),
+      ~ ifelse(.x %in% c(7, 8, 9), NA, .x)))
+
+asia_final <- comb_data |>
+  mutate(
+    across(
+      c(model_development, china_dem),
+      ~ ifelse(.x %in% c(97, 98, 99), NA, .x)))
+
+asia_final <- asia_final |>
+  mutate(
+    across(model_development,
+           ~ ifelse(.x %in% c(8, 97, 98, 99), NA, .x)))
+asia_final
+```
+
+
+ACLED API Pull
+```{r}
+base_url <- "https://acleddata.com/api/acled/read"
+token <- read_file("access_token.txt")
+
+resp <- GET(url = base_url,
+            query = list(`_format` = "csv",
+                         country = "Philippines",
+                         event_date = "2018-01-01|2021-12-31",
+                         event_date_where = "BETWEEN",
+                         limit = 0),
+            add_headers(Authorization = paste("Bearer", token))
+            )
+
+stop_for_status(resp)
+
+
+
+csv_txt <- content(resp, as = "text", encoding = "UTF-8")
+ph_acled <- read_csv(csv_txt, show_col_types = FALSE)
+ph_acled
+
+
+```
+ACLED Cleaning
+
+```{r}
+ph_china_events <- ph_acled|>
+  mutate(
+    notes = tolower(notes),
+    actor1 = tolower(actor1),
+    actor2 = tolower(actor2),
+    assoc1 = tolower(assoc_actor_1),
+    assoc2 = tolower(assoc_actor_2),
+    location = tolower(location),
+    disorder_type = tolower(disorder_type),
+    event_type = tolower(event_type),
+    sub_event_type = tolower(sub_event_type),
+    china_tf =
+      str_detect(notes, "(?i)china|chinese|south china sea") |
+      str_detect(actor1, "china|chinese") |
+      str_detect(actor2, "china|chinese") |
+      str_detect(assoc1, "china|chinese") |
+      str_detect(assoc2, "china|chinese")) |>
+  filter(china_tf == TRUE) |>
+  mutate(
+    event_date = as.Date(event_date),
+    month = floor_date(event_date, "month")
+)
+
+acled_data <- ph_china_events |>
+  select(event_date,
+         month,
+         location,
+         actor1,
+         assoc1,
+         actor2,
+         assoc2,
+         disorder_type,
+         event_type,
+         sub_event_type,
+         fatalities,
+         notes)
+
+acled_data
+
+
+write.csv(acled_data, "~/Downloads/acled_data.csv", row.names = FALSE)
+
+```
+
+```{r}
+acled_data |>
+count(month, event_type, name = "n_events") |>
+complete(month, event_type, fill = list(n_events = 0))|>
+ggplot(aes(x = month, y = n_events, color = event_type)) +
+geom_line() +
+geom_point() +
+scale_x_date(date_breaks = "4 months", date_labels = "%b %Y") +
+labs(
+title = "China-Related ACLED Events in the Philippines, by Type",
+x = "Month",
+y = "Number of Events",
+color = "Event Type"
+) +
+theme_minimal(base_size = 13) +
+theme(
+plot.title = element_text(face = "bold"),
+axis.text.x = element_text(angle = 45, hjust = 1)
+)
+
+```
+
+```{r}
+var <- "model_development"
+
+asia_final %>%
+filter(!is.na(.data[[var]])) %>%
+count(wave, value = .data[[var]]) %>%
+group_by(wave) %>%
+mutate(prop = n / sum(n)) %>%
+ggplot(aes(x = factor(wave), y = prop, fill = factor(value))) +
+geom_col(position = "fill") +
+scale_y_continuous(labels = scales::percent_format()) +
+scale_fill_brewer(palette = "RdYlGn", direction = -1) + # ← green→yellow→red
+labs(
+title = paste("Distribution of", var, "Responses by Wave (Percent)"),
+x = "Asian Barometer Wave",
+y = "Percentage of Respondents",
+fill = var
+) +
+theme_minimal(base_size = 14)
+
+```
+
+```{r}
+kvars <- c(
+"asia_influence","china_harm","china_world_inf","asia_future_inf",
+"model_development","china_deg_inf","china_inf_op","china_dem",
+"aspect_power","way_of_life","foreign_immigration"
+)
+# 1. Keep only respondents with complete data for these variables
+asia_k <- asia_final %>%
+select(wave, all_of(kvars)) %>%
+drop_na()
+# 2. Scale the attitude variables
+asia_scaled <- scale(asia_k %>% select(all_of(kvars)))
+# 3. Run K-means (K = 3)
+set.seed(123)
+fviz_nbclust(asia_scaled, kmeans, method = "wss") +
+labs(title = "Calinski-Harabasz Index for Optimal K")
+km7 <- kmeans(asia_scaled, centers = 7, nstart = 25)
+# 4. Attach cluster labels
+asia_k$cluster <- factor(km7$cluster)
+# 5. Inspect cluster profiles
+cluster_profiles <- asia_k %>%
+group_by(cluster) %>%
+summarise(across(all_of(kvars), mean), .groups = "drop")
+cluster_profiles
+```
+
+
+
+```{r}
+var <- "china_harm"
+asia_k %>%
+filter(!is.na(.data[[var]])) %>%
+count(cluster, wave, value = .data[[var]]) %>%        # include cluster
+group_by(cluster, wave) %>%
+mutate(prop = n / sum(n)) %>%
+ggplot(aes(x = factor(wave), y = prop, fill = factor(value))) +
+geom_col(position = "fill") +
+scale_y_continuous(labels = scales::percent_format()) +
+scale_fill_brewer(palette = "RdYlGn", direction = -1) +
+labs(
+title = paste("Distribution of", var, "Responses by Wave (Percent)"),
+x = "Asian Barometer Wave",
+y = "Percentage of Respondents",
+fill = var
+) +
+theme_minimal(base_size = 14) +
+facet_wrap(~ cluster)
+```
+
+
