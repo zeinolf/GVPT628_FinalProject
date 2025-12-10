@@ -1,0 +1,505 @@
+---
+title: "K-Means & PCA Work"
+author: "Zach Einolf"
+date: "2025-12-16"
+output: pdf_document
+---
+
+```{r, include=FALSE}
+library(readr)
+library(dplyr)
+library(tidyverse)
+library(cluster)
+library(factoextra)
+library(ggplot2)
+library(haven)
+library(doBy)
+library(tidyr)
+library(acled.api)
+library(httr)
+library(httr2)
+library(purrr)
+library(xml2)
+library(httr)
+library(httr2)
+library(readr)
+library(stringr)
+library(DBI)
+library(RSQLite)
+library(scales)
+library(fastDummies)
+library(plotly)
+library(VIM)
+
+```
+
+Asian Barometer Wave 3 K-Means Work
+```{r}
+#loading wave 3
+con <- dbConnect(SQLite(), "../data/ab_wave3_c.db") 
+ab_wave3_c<- dbReadTable(con, "ab_wave3_c.db") 
+dbDisconnect(con)
+
+#cleaning
+ab_wave3_c <- ab_wave3_c |>
+  mutate(
+    across(
+      c(
+        asia_influence, china_harm, china_deg_inf, china_inf_op, asia_future_inf
+      ),
+      ~ ifelse(.x %in% c(7, 8, 9), NA, .x)),
+    across(
+      c(asia_influence, model_development, china_dem, asia_future_inf),
+      ~ ifelse(.x %in% c(19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 97, 98, 99), NA, .x)),
+    across(model_development,
+           ~ ifelse(.x %in% c(8, 97, 98, 99), NA, .x)))
+
+
+#selected attitude variables for clustering
+attitude_vars <- c(
+  "asia_influence",
+  "china_harm",
+  "asia_future_inf",
+  "model_development",
+  "china_deg_inf",
+  "china_inf_op",
+  "china_dem"
+)
+
+#subselecting
+asia3_k <- ab_wave3_c |>
+  select(idnumber, all_of(attitude_vars))
+
+#imputing missing data by using nearest neighbor
+asia3_imputed <- kNN(
+  asia3_k,
+  variable = attitude_vars,
+  k = 5 
+)
+
+#rescaling and filtering out the idnumber
+asia3_scaled <- asia3_imputed|>
+  select(all_of(attitude_vars))|>
+  scale()
+
+set.seed(100)
+
+#elbow plot 
+wss3_df <- tibble(
+  k = 1:10,
+  wss = map_dbl(1:10, ~ kmeans(asia3_scaled, centers = .x, nstart = 25)$tot.withinss)
+)
+
+ggplot(wss3_df, aes(x = k, y = wss)) +
+  geom_line(linewidth = 1.2, color = "red") +
+  geom_point(size = 3, color = "black", fill = "red", shape = 21, stroke = 1) +
+  scale_x_continuous(breaks = 1:10) +
+  labs(
+    title = "Elbow Plot for K-Means Clustering of Wave 3",
+    x = "Number of Clusters (k)",
+    y = "WSS"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    panel.background  = element_rect(fill = "black", color = NA),
+    plot.background   = element_rect(fill = "black", color = NA),
+    legend.background = element_rect(fill = "black", color = NA),
+    panel.grid.major  = element_line(color = "grey20"),
+    panel.grid.minor  = element_blank(),
+    axis.text         = element_text(color = "white"),
+    axis.title        = element_text(color = "white"),
+    legend.text       = element_text(color = "white"),
+    legend.title      = element_text(color = "white"),
+    strip.text        = element_text(color = "white"),
+    plot.title        = element_text(color = "white", face = "bold", size = 13, hjust = 0.5),
+    plot.subtitle     = element_text(color = "white", size = 13, hjust = 0.5),
+    axis.text.x       = element_text(angle = 45)
+  )
+
+#ggsave("../visualizations/elbow_3.png")
+
+#kmeans clustering with 2 centers
+km2_3 <- kmeans(asia3_scaled, centers = 2, nstart = 60)#2 chosen here based on elbow plot and to stay consistent with other waves
+
+#putting clusters back onto reduced dataset
+asia3_k <- asia3_k|>
+  mutate(cluster = factor(km2_3$cluster))
+
+#adding clusters back to original using idnumbers
+asia3_clusters<- ab_wave3_c|>
+  left_join(
+    asia3_k|>
+      select(idnumber, cluster),
+    by = "idnumber"
+  )
+
+#writing wave 3 to db
+con <- dbConnect(SQLite(), "../data/asia3_clusters.db")
+dbWriteTable(con, "asia3_clusters", asia3_clusters, overwrite = TRUE)
+dbDisconnect(con)
+```
+
+Asian Barometer Wave 4 K-Means Work
+```{r}
+#loading wave 4 data
+con <- dbConnect(SQLite(), "../data/ab_wave4_c.db") 
+ab_wave4_c<- dbReadTable(con, "ab_wave4_c.db") 
+dbDisconnect(con)
+
+#cleaning
+ab_wave4_c <- ab_wave4_c |>
+  mutate(
+    across(
+      c(
+        asia_influence, china_harm, china_deg_inf, china_inf_op, asia_future_inf
+      ),
+      ~ ifelse(.x %in% c(7, 8, 9), NA, .x)),
+    across(
+      c(asia_influence, model_development, china_dem, asia_future_inf),
+      ~ ifelse(.x %in% c(19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 97, 98, 99), NA, .x)),
+    across(model_development,
+           ~ ifelse(.x %in% c(8, 97, 98, 99), NA, .x)))
+
+#subselecting
+asia4_k <- ab_wave4_c |>
+  select(idnumber, all_of(attitude_vars))
+
+#imputing missing data by using nearest neighbor
+asia4_imputed <- kNN(
+  asia4_k,
+  variable = attitude_vars,
+  k = 5 
+)
+
+#rescaling and filtering out the idnumber
+asia4_scaled <- asia4_imputed|>
+  select(all_of(attitude_vars))|>
+  scale()
+
+set.seed(100)
+
+#elbow plot 
+wss4_df <- tibble(
+  k = 1:10,
+  wss = map_dbl(1:10, ~ kmeans(asia4_scaled, centers = .x, nstart = 25)$tot.withinss)
+)
+ggplot(wss4_df, aes(x = k, y = wss)) +
+  geom_line(linewidth = 1.2, color = "red") +
+  geom_point(size = 3, color = "black", fill = "red", shape = 21, stroke = 1) +
+  scale_x_continuous(breaks = 1:10) +
+  labs(
+    title = "Elbow Plot for K-Means Clustering of Wave 4",
+    x = "Number of Clusters (k)",
+    y = "WSS"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    panel.background  = element_rect(fill = "black", color = NA),
+    plot.background   = element_rect(fill = "black", color = NA),
+    legend.background = element_rect(fill = "black", color = NA),
+    panel.grid.major  = element_line(color = "grey20"),
+    panel.grid.minor  = element_blank(),
+    axis.text         = element_text(color = "white"),
+    axis.title        = element_text(color = "white"),
+    legend.text       = element_text(color = "white"),
+    legend.title      = element_text(color = "white"),
+    strip.text        = element_text(color = "white"),
+    plot.title        = element_text(color = "white", face = "bold", size = 13, hjust = 0.5),
+    plot.subtitle     = element_text(color = "white", size = 13, hjust = 0.5),
+    axis.text.x       = element_text(angle = 45)
+  )
+
+#ggsave("../visualizations/elbow_4.png")
+
+#kmeans clustering with 2 centers
+km2_4 <- kmeans(asia4_scaled, centers = 2, nstart = 40)#2 chosen here based on elbow plot and to stay consistent with other waves
+
+#putting clusters back onto reduced dataset
+asia4_k <- asia4_k|>
+  mutate(cluster = factor(km2_4$cluster))
+
+#adding clusters back to original using idnumbers
+asia4_clusters<- ab_wave4_c|>
+  left_join(
+    asia4_k|>
+      select(idnumber, cluster),
+    by = "idnumber"
+  )
+
+#writing wave 4 to db
+con <- dbConnect(SQLite(), "../data/asia4_clusters.db")
+dbWriteTable(con, "asia4_clusters", asia4_clusters, overwrite = TRUE)
+dbDisconnect(con)
+
+```
+Asian Barometer Wave 5 K-Means Work
+```{r}
+#loading wave 5 data
+con <- dbConnect(SQLite(), "../data/ab_wave5_c.db") 
+ab_wave5_c<- dbReadTable(con, "ab_wave5_c.db") 
+dbDisconnect(con)
+
+#cleaning
+ab_wave5_c <- ab_wave5_c |>
+  mutate(
+    across(
+      c(
+        asia_influence, china_harm, china_deg_inf, china_inf_op, asia_future_inf
+      ),
+      ~ ifelse(.x %in% c(7, 8, 9), NA, .x)),
+    across(
+      c(asia_influence, model_development, china_dem, asia_future_inf),
+      ~ ifelse(.x %in% c(19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 97, 98, 99), NA, .x)),
+    across(model_development,
+           ~ ifelse(.x %in% c(8, 97, 98, 99), NA, .x)))
+
+#subselecting
+asia5_k <- ab_wave5_c |>
+  select(idnumber, all_of(attitude_vars))
+
+#imputing missing data by using nearest neighbor
+asia5_imputed <- kNN(
+  asia5_k,
+  variable = attitude_vars,
+  k = 5 
+)
+
+#rescaling and filtering out the idnumber
+asia5_scaled <- asia5_imputed|>
+  select(all_of(attitude_vars))|>
+  scale()
+
+set.seed(100)
+
+#elbow plot 
+wss5_df <- tibble(
+  k = 1:10,
+  wss = map_dbl(1:10, ~ kmeans(asia5_scaled, centers = .x, nstart = 25)$tot.withinss)
+)
+ggplot(wss4_df, aes(x = k, y = wss)) +
+  geom_line(linewidth = 1.2, color = "red") +
+  geom_point(size = 3, color = "black", fill = "red", shape = 21, stroke = 1) +
+  scale_x_continuous(breaks = 1:10) +
+  labs(
+    title = "Elbow Plot for K-Means Clustering of Wave 5",
+    x = "Number of Clusters (k)",
+    y = "WSS"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    panel.background  = element_rect(fill = "black", color = NA),
+    plot.background   = element_rect(fill = "black", color = NA),
+    legend.background = element_rect(fill = "black", color = NA),
+    panel.grid.major  = element_line(color = "grey20"),
+    panel.grid.minor  = element_blank(),
+    axis.text         = element_text(color = "white"),
+    axis.title        = element_text(color = "white"),
+    legend.text       = element_text(color = "white"),
+    legend.title      = element_text(color = "white"),
+    strip.text        = element_text(color = "white"),
+    plot.title        = element_text(color = "white", face = "bold", size = 13, hjust = 0.5),
+    plot.subtitle     = element_text(color = "white", size = 13, hjust = 0.5),
+    axis.text.x       = element_text(angle = 45)
+  )
+
+#ggsave("../visualizations/elbow_5.png")
+
+#kmeans clustering with 2 centers
+set.seed(100)
+km2_5 <- kmeans(asia5_scaled, centers = 2, nstart = 62)#2 chosen here based on elbow plot and to stay consistent with other waves
+
+head(km2_5$cluster)
+#putting clusters back onto reduced dataset
+asia5_k <- asia5_k|>
+  mutate(cluster = factor(3 - as.numeric(km2_5$cluster)))|> #had to flip 1 and 2 for consistency with other cluster waves
+  mutate(cluster = factor(cluster))
+
+head(asia5_k$cluster)
+#adding clusters back to original using idnumbers
+asia5_clusters<- ab_wave5_c|>
+  left_join(
+    asia5_k|>
+      select(idnumber, cluster),
+    by = "idnumber"
+  )
+
+#writing wave 5 to db
+con <- dbConnect(SQLite(), "../data/asia5_clusters.db")
+dbWriteTable(con, "asia5_clusters", asia5_clusters, overwrite = TRUE)
+dbDisconnect(con)
+```
+
+
+Asian Barometer Wave 6 K-Means Work
+```{r}
+#loading wave 5 data
+con <- dbConnect(SQLite(), "../data/ab_wave6_c.db") 
+ab_wave6_c<- dbReadTable(con, "ab_wave6_c.db") 
+dbDisconnect(con)
+
+#cleaning
+ab_wave6_c <- ab_wave6_c |>
+  mutate(
+    across(
+      c(
+        asia_influence, china_harm, china_deg_inf, china_inf_op, asia_future_inf
+      ),
+      ~ ifelse(.x %in% c(7, 8, 9), NA, .x)),
+    across(
+      c(asia_influence, model_development, china_dem, asia_future_inf),
+      ~ ifelse(.x %in% c(19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 97, 98, 99), NA, .x)),
+    across(model_development,
+           ~ ifelse(.x %in% c(8, 97, 98, 99), NA, .x)))
+
+#subselecting
+asia6_k <- ab_wave6_c |>
+  select(idnumber, all_of(attitude_vars))
+
+#imputing missing data by using nearest neighbor
+asia6_imputed <- kNN(
+  asia6_k,
+  variable = attitude_vars,
+  k = 5 
+)
+
+#rescaling and filtering out the idnumber
+asia6_scaled <- asia6_imputed|>
+  select(all_of(attitude_vars))|>
+  scale()
+
+set.seed(100)
+
+#elbow plot 
+wss6_df <- tibble(
+  k = 1:10,
+  wss = map_dbl(1:10, ~ kmeans(asia6_scaled, centers = .x, nstart = 25)$tot.withinss)
+)
+ggplot(wss6_df, aes(x = k, y = wss)) +
+  geom_line(linewidth = 1.2, color = "red") +
+  geom_point(size = 3, color = "black", fill = "red", shape = 21, stroke = 1) +
+  scale_x_continuous(breaks = 1:10) +
+  labs(
+    title = "Elbow Plot for K-Means Clustering of Wave 6",
+    x = "Number of Clusters (k)",
+    y = "WSS"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    panel.background  = element_rect(fill = "black", color = NA),
+    plot.background   = element_rect(fill = "black", color = NA),
+    legend.background = element_rect(fill = "black", color = NA),
+    panel.grid.major  = element_line(color = "grey20"),
+    panel.grid.minor  = element_blank(),
+    axis.text         = element_text(color = "white"),
+    axis.title        = element_text(color = "white"),
+    legend.text       = element_text(color = "white"),
+    legend.title      = element_text(color = "white"),
+    strip.text        = element_text(color = "white"),
+    plot.title        = element_text(color = "white", face = "bold", size = 13, hjust = 0.5),
+    plot.subtitle     = element_text(color = "white", size = 13, hjust = 0.5),
+    axis.text.x       = element_text(angle = 45)
+  )
+
+#ggsave("../visualizations/elbow_6.png")
+
+#kmeans clustering with 3 centers
+km2_6 <- kmeans(asia6_scaled, centers = 2, nstart = 95) #2 chosen here based on elbow plot and to stay consistent with other waves
+
+#putting clusters back onto reduced dataset
+asia6_k <- asia6_k|>
+  mutate(cluster = factor(km2_6$cluster))
+
+#adding clusters back to original using idnumbers
+asia6_clusters<- ab_wave6_c|>
+  left_join(
+    asia6_k|>
+      select(idnumber, cluster),
+    by = "idnumber"
+  )
+
+#writing wave 6 to db
+con <- dbConnect(SQLite(), "../data/asia6_clusters.db")
+dbWriteTable(con, "asia6_clusters", asia6_clusters, overwrite = TRUE)
+dbDisconnect(con)
+
+```
+
+
+Combining all waves and conducting final cleaning/NA removal
+```{r}
+#combining the data into one frame
+comb_data_cluster <- bind_rows(asia3_clusters, asia4_clusters, asia5_clusters, asia6_clusters) |>
+  arrange(year, wave, idnumber)
+
+#final cleaning
+comb_data_cluster <- comb_data_cluster |>
+    mutate(
+      across(
+        c(
+          asia_influence, china_harm, china_deg_inf, china_inf_op, asia_future_inf
+        ),
+        ~ ifelse(.x %in% c(7, 8, 9), NA, .x)),
+      across(
+        c(asia_influence, model_development, china_dem, asia_future_inf),
+        ~ ifelse(.x %in% c(16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 97, 98, 99), NA, .x)),
+      across(model_development,
+             ~ ifelse(.x %in% c(8, 97, 98, 99), NA, .x)),
+      across(country_problem1,
+           ~ ifelse(.x %in% c(990, 997, 998, 998), NA, .x)))
+
+
+#writing data file to database
+con <- dbConnect(SQLite(), "../data/asia_final_cluster.db")
+dbWriteTable(con, "asia_final_cluster.db", comb_data_cluster , overwrite = TRUE)
+dbDisconnect(con)
+
+asia_final_cluster <- comb_data_cluster
+
+```
+
+
+Principal Component Analysis
+```{r}
+#defining demographic variables
+demo_vars <- c(
+  "locality_level",
+  "education",
+  "age",
+  "gender",
+  "region"
+)
+
+#defining all variables
+all_vars <- c(demo_vars, attitude_vars)
+
+#building PCA dataset from cluster work
+asia_pca <- asia_final_cluster |>
+  select(wave, cluster, all_of(all_vars)) |>
+  drop_na() |>
+  mutate(
+    wave    = factor(wave),
+    cluster = factor(cluster)
+  )
+
+#running PCA on attitude variables
+X <- asia_pca |>
+  select(all_of(attitude_vars)) |>
+  scale()
+
+set.seed(100)
+pca <- prcomp(X, center = FALSE, scale. = FALSE)
+
+#adding scores back rows
+pca_scores <- as_tibble(pca$x[, 1:2]) |>
+  rename(PC1 = PC1, PC2 = PC2)
+
+#combining
+pca_combined <- bind_cols(asia_pca, pca_scores)
+
+#writing to db for saving
+con <- dbConnect(SQLite(), "../data/pca_combined.db")
+dbWriteTable(con, "pca_combined.db", pca_combined, overwrite = TRUE)
+dbDisconnect(con)
+
+```
+
