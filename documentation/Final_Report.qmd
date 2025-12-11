@@ -1,0 +1,545 @@
+---
+title: Did China Drive Its Own Image Problem? Analyzing Events and Filipino Public Opinion
+author: Zach Einolf
+date: 17 December 2025
+embed-resources: true
+editor: visual
+execute:
+  warning: false
+  message: false
+  error: false
+  tidy: true
+format: html
+theme: darkly
+toc: true
+toc-depth: 2
+runtime: shiny
+---
+
+```{r, include=FALSE}
+library(readr)
+library(dplyr)
+library(tidyverse)
+library(cluster)
+library(factoextra)
+library(ggplot2)
+library(haven)
+library(doBy)
+library(tidyr)
+library(acled.api)
+library(httr)
+library(httr2)
+library(purrr)
+library(xml2)
+library(httr)
+library(httr2)
+library(readr)
+library(stringr)
+library(DBI)
+library(RSQLite)
+library(scales)
+library(fastDummies)
+```
+
+```{r}
+con <- dbConnect(SQLite(), "../data/acled_data.db")
+acled_data <- dbReadTable(con, "acled_data.db")
+dbDisconnect(con)
+
+acled_data_c<- acled_data|> 
+  mutate(
+  event_date = ymd(event_date),
+  month = as.Date(month))|>
+  filter(event_type %in% c("protests", "strategic developments"))
+
+acled_data_c |>
+  count(month, event_type, name = "n_events") |>
+  complete(month, event_type, fill = list(n_events = 0))|>
+  ggplot(aes(x = month, y = n_events, color = event_type)) +
+  geom_line() +
+  geom_point() +
+  scale_x_date(date_breaks = "5 months", date_labels = "%b %Y") +
+  labs(
+    title = "ACLED Events Involving China/Philippines Government and Civilian Hostility",
+    x = "Month",
+    y = "Number of Events",
+    color = "Event Type"
+    ) +
+  theme_minimal(base_size = 13) +
+  theme(
+    panel.background  = element_rect(fill = "black", color = NA),
+    plot.background   = element_rect(fill = "black", color = NA),
+    legend.background = element_rect(fill = "black", color = NA),
+    panel.grid.major  = element_line(color = "grey20"),
+    panel.grid.minor  = element_blank(),
+    axis.text         = element_text(color = "white"),
+    axis.title        = element_text(color = "white"),
+    legend.text       = element_text(color = "white"),
+    legend.title      = element_text(color = "white"),
+    strip.text        = element_text(color = "white"),
+    plot.title        = element_text(color = "white", face = "bold", size = 10, hjust = 0.5),
+    plot.subtitle     = element_text(color = "white", size = 8, hjust = 0.5),
+    axis.text.x       = element_text(angle = 45, hjust = 1)
+  )
+
+#ggsave("../visualizations/acled_event_time.png")
+```
+
+```{}
+```
+
+```{r}
+con <- dbConnect(SQLite(), "../data/asia_final_cluster.db")
+asia_final_cluster <- dbReadTable(con, "asia_final_cluster.db")
+dbDisconnect(con)
+
+attitude_vars <- c(
+  "asia_influence",
+  "china_harm",
+  "asia_future_inf",
+  "model_development",
+  "china_deg_inf",
+  "china_inf_op",
+  "china_dem"
+)
+
+#defining
+demo_vars <- c(
+  "locality_level",
+  "education",
+  "age",
+  "gender",
+  "region"
+)
+
+#defining
+all_vars <- c(demo_vars, attitude_vars)
+
+cluster_profiles_wave <- asia_final_cluster |>
+  filter(!is.na(cluster)) |>
+  mutate(
+    wave_label = factor(
+      wave,
+      levels = c(3,4, 5, 6),
+      labels = c("Wave 3 (2010)", "Wave 4 (2014)", "Wave 5 (2018)", "Wave 6 (2021)")
+    )
+  ) |>
+  group_by(wave_label, cluster) |>
+  summarize(
+    across(all_of(attitude_vars), ~ mean(.x, na.rm = TRUE)),
+    .groups = "drop"
+  ) |>
+  pivot_longer(
+    cols = all_of(attitude_vars),
+    names_to = "variable",
+    values_to = "mean_val"
+  )
+
+ggplot(
+  cluster_profiles_wave,
+  aes(x = variable, y = mean_val, group = cluster, color = cluster)
+) +
+  geom_line() +
+  geom_point() +
+  coord_polar() +
+  facet_wrap(~ wave_label, nrow = 3) +
+  labs(
+    title = "Cluster Profiles Across China-Related Attitudes by Wave",
+    x = "",
+    y = "Mean (original scale)",
+    color = "Cluster"
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    panel.background  = element_rect(fill = "black", color = NA),
+    plot.background   = element_rect(fill = "black", color = NA),
+    legend.background = element_rect(fill = "black", color = NA),
+    panel.grid.major  = element_line(color = "grey20"),
+    panel.grid.minor  = element_blank(),
+    axis.text         = element_text(color = "white"),
+    axis.title        = element_text(color = "white"),
+    legend.text       = element_text(color = "white"),
+    legend.title      = element_text(color = "white"),
+    strip.text        = element_text(color = "white"),
+    plot.title        = element_text(color = "white", face = "bold", size = 13, hjust = 0.5),
+    plot.subtitle     = element_text(color = "white", size = 13, hjust = 0.5),
+    axis.text.x       = element_text(size = 5, angle = 45, hjust = 1),
+    plot.margin = margin(40, 40, 40, 40),
+    panel.spacing = unit(2, "cm")
+  )+
+  coord_polar(clip = "off")
+
+#ggsave("../visualizations/attitude_radar.png")
+```
+
+```{r}
+con <- dbConnect(SQLite(), "../data/pca_combined.db") 
+pca_combined<- dbReadTable(con, "pca_combined.db") 
+dbDisconnect(con)
+
+
+## 6) PLOT: Correlation heatmap of PCs with attitude variables ----
+cor_PC_att <- pca_combined |>
+  select(PC1, PC2, all_of(attitude_vars)) |>
+  cor(use = "pairwise.complete.obs")
+
+cor_PC_att_df <- as.data.frame(cor_PC_att) |>
+  rownames_to_column("row_var") |>
+  pivot_longer(
+    cols = -row_var,
+    names_to = "col_var",
+    values_to = "correlation"
+  )
+
+ggplot(cor_PC_att_df, aes(x = col_var, y = row_var, fill = correlation)) +
+  geom_tile() +
+  scale_fill_gradient2(limits = c(-1, 1)) +
+  labs(
+    title = "Correlation of PCs with Attitude Variables",
+    x = "",
+    y = "",
+    fill = "r"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+
+## 7) PLOT: PCA scatter, colored by cluster, shaped by wave ----
+ggplot(pca_combined, aes(x = PC1, y = PC2, color = cluster, shape = wave)) +
+  geom_point(alpha = 0.7) +
+  labs(
+    title = "PCA of China-Related Attitudes Colored by Cluster",
+    x = "PC1",
+    y = "PC2",
+    color = "Cluster",
+    shape = "Wave"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(
+    panel.background  = element_rect(fill = "black", color = NA),
+    plot.background   = element_rect(fill = "black", color = NA),
+    legend.background = element_rect(fill = "black", color = NA),
+    panel.grid.major  = element_line(color = "grey20"),
+    panel.grid.minor  = element_blank(),
+    axis.text         = element_text(color = "white"),
+    axis.title        = element_text(color = "white"),
+    legend.text       = element_text(color = "white"),
+    legend.title      = element_text(color = "white"),
+    strip.text        = element_text(color = "white"),
+    plot.title        = element_text(color = "white", face = "bold", size = 13, hjust = 0.5),
+    plot.subtitle     = element_text(color = "white", size = 13, hjust = 0.5),
+    axis.text.x       = element_text(angle = 45)
+  ) +
+  guides(
+    shape = guide_legend(override.aes = list(color = "white", fill = "white"))
+  )
+```
+
+```{r}
+
+## 8) PLOT: PC1 by region (cluster still available if you want to facet by it) ----
+ggplot(pca_combined, aes(x = region, y = PC1)) +
+  stat_summary(fun = mean, geom = "point") +
+  stat_summary(fun.data = mean_cl_normal, geom = "errorbar", width = 0.2) +
+  labs(
+    title = "Mean PC1 by Region (with 95% CI)",
+    x = "Region",
+    y = "Mean PC1"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+# app.R
+library(shiny)
+library(dplyr)
+library(ggplot2)
+library(scales)
+library(rlang)
+
+# ============ 1. Choices & labels =======================================
+
+# Variables that make sense as stacked categorical responses
+var_choices <- c(
+  "China influence on our country"           = "china_inf_op",
+  "China influence on world affairs"         = "china_world_inf",
+  "China harm vs. good to Asia"              = "china_harm",
+  "China democratic scale (1–10)"            = "china_dem",
+  "China influence on our country (degree)"  = "china_deg_inf",
+  "Best model for development"               = "model_development",
+  "Which country has most influence in Asia" = "asia_influence",
+  "In 10 years, most influence in Asia"      = "asia_future_inf",
+  "Way of life statement"                    = "way_of_life",
+  "Aspect of major power influence"          = "aspect_power",
+  "Immigration: inflow of foreigners"        = "foreign_immigration",
+  "K-Means Clustering Group"                 = "cluster"
+)
+
+# Facet options (including "none")
+facet_choices <- c(
+  "None (all respondents)" = "none",
+  "Cluster"                = "cluster",
+  "Gender"                 = "gender",
+  "Education level"        = "education",
+  "Locality level"         = "locality_level"
+)
+
+# Pretty titles per variable
+var_titles <- list(
+  way_of_life      = "Should our country defend our way of life or learn from others?",
+  aspect_power     = "Which aspect of power do you think of when you refer to powerful countries?",
+  china_world_inf  = "Generally speaking, the influence China today has on world affairs is…",
+  foreign_immigration = "Should the government increase or decrease inflow of foreign workers?",
+  china_deg_inf    = "How much influence does China have on our country?",
+  china_inf_op     = "Generally speaking, the influence China has on our country is…",
+  model_development = "Which country should be a model for our country’s future development?",
+  asia_future_inf  = "In ten years, which country will have the most influence in Asia?",
+  china_harm       = "Does China do more good or harm to Asia?",
+  asia_influence   = "Which country has the most influence in Asia?",
+  china_dem        = "Where would you place China today on the democracy scale?",
+  cluster          = "K-Means Clustering Group"
+)
+
+# Response labels for each variable (named by code)
+response_labels <- list(
+  way_of_life = c(
+    "1" = "Defend our way of life",
+    "2" = "Learn from other countries"
+  ),
+  aspect_power = c(
+    "1" = "Politics",
+    "2" = "Economy",
+    "3" = "(Military) Security",
+    "4" = "Culture",
+    "5" = "Other"
+  ),
+  china_world_inf = c(
+    "1" = "Very positive",
+    "2" = "Positive",
+    "3" = "Somewhat positive",
+    "4" = "Somewhat negative",
+    "5" = "Negative",
+    "6" = "Very negative"
+  ),
+  china_inf_op = c(
+    "1" = "Very positive",
+    "2" = "Positive",
+    "3" = "Somewhat positive",
+    "4" = "Somewhat negative",
+    "5" = "Negative",
+    "6" = "Very negative"
+  ),
+  china_harm = c(
+    "1" = "Much more good than harm",
+    "2" = "Somewhat more good than harm",
+    "3" = "Somewhat more harm than good",
+    "4" = "Much more harm than good"
+  ),
+  china_deg_inf = c(
+    "1" = "A great deal of influence",
+    "2" = "Some influence",
+    "3" = "Not much influence",
+    "4" = "No influence at all"
+  ),
+  model_development = c(
+    "1" = "United States",
+    "2" = "China",
+    "3" = "India",
+    "4" = "Japan",
+    "5" = "Singapore",
+    "6" = "Other"
+  ),
+  asia_influence = c(
+    "1" = "China",
+    "2" = "Japan",
+    "3" = "India",
+    "4" = "United States",
+    "5" = "Other"
+  ),
+  asia_future_inf = c(
+    "1" = "China",
+    "2" = "Japan",
+    "3" = "India",
+    "4" = "United States",
+    "5" = "Other"
+  ),
+  foreign_immigration = c(
+    "1" = "Increase inflow",
+    "2" = "Maintain current inflow",
+    "3" = "Reduce inflow",
+    "4" = "No more foreigners"
+  ),
+  china_dem = c(
+    "1" = "Completely Undemocratic",
+    "10" = "Completely Democratic"
+  ),
+  cluster = c(
+    "1" = "Cluster 1",
+    "2" = "Cluster 2"
+  )
+)
+
+# ===== LABEL MAPS FOR FACET VARIABLES =====
+
+facet_label_maps <- list(
+
+  gender = c(
+    "1" = "Male",
+    "2" = "Female"
+  ),
+
+  cluster = c(
+    "1" = "Cluster 1",
+    "2" = "Cluster 2"
+  ),
+
+  education = c(
+    "1" = "No formal education",
+    "2" = "Incomplete primary",
+    "3" = "Complete primary",
+    "4" = "Incomplete secondary (tech/voc)",
+    "5" = "Complete secondary (tech/voc)",
+    "6" = "Incomplete secondary",
+    "7" = "Complete secondary",
+    "8" = "Some university",
+    "9" = "University completed",
+    "10" = "Post-graduate degree"
+  ),
+
+  locality_level = c(
+    "1" = "Megacity (1M+ people)",
+    "2" = "Major city (100k+)",
+    "3" = "Small town (<100k)",
+    "4" = "Village / countryside"
+  )
+)
+
+# Helper to apply labels in facet strips
+facet_labeller <- function(facet_var) {
+  function(value) {
+    labels <- facet_label_maps[[facet_var]]
+    if (is.null(labels)) return(value)
+    out <- labels[as.character(value)]
+    out[is.na(out)] <- value[is.na(out)]
+    out
+  }
+}
+# Helper: build a label function for the selected var
+label_fun_for_var <- function(var) {
+  function(x) {
+    labs <- response_labels[[var]]
+    if (is.null(labs)) return(x)
+    out <- labs[as.character(x)]
+    out[is.na(out)] <- x[is.na(out)]
+    out
+  }
+}
+
+# ============ 2. UI =====================================================
+ui <- fluidPage(
+  titlePanel("Asian Barometer – Attitudes & China Questions"),
+  
+  sidebarLayout(
+    sidebarPanel(
+      selectInput(
+        inputId  = "var",
+        label    = "Select question / variable:",
+        choices  = var_choices,
+        selected = "china_inf_op"
+      ),
+      selectInput(
+        inputId  = "facet",
+        label    = "Facet by (optional):",
+        choices  = facet_choices,
+        selected = "none"
+      )
+    ),
+    mainPanel(
+      plotOutput("stackPlot", height = "550px")
+    )
+  )
+)
+
+# ============ 3. Server =================================================
+server <- function(input, output, session) {
+  
+  output$stackPlot <- renderPlot({
+    var        <- input$var
+    facet_var  <- input$facet
+    
+    # Title
+    plot_title <- var_titles[[var]]
+    if (is.null(plot_title)) plot_title <- var
+    
+    # Build a facet variable column; if "none", everyone in the same group
+    df <- asia_final_cluster |>
+      filter(!is.na(.data[[var]])) |>
+      mutate(
+        facet_group = if (facet_var == "none") {
+          "All respondents"
+        } else {
+          as.factor(.data[[facet_var]])
+        }
+      ) |>
+      count(wave, facet_group, value = .data[[var]]) |>
+      group_by(wave, facet_group) |>
+      mutate(prop = n / sum(n))
+    
+    ggplot(
+      df,
+      aes(
+        x    = factor(wave),
+        y    = prop,
+        fill = factor(value)
+      )
+    ) +
+      geom_col(position = "fill") +
+      scale_y_continuous(labels = percent_format()) +
+      scale_fill_brewer(
+        palette  = "RdYlGn",
+        direction = -1,
+        labels   = label_fun_for_var(var)
+      ) +
+      labs(
+        title = plot_title,
+        x     = "Asian Barometer Wave",
+        y     = "Percentage of Respondents",
+        fill  = "Response"
+      ) +
+      {
+        if (facet_var == "none") {
+          theme()
+        } else {
+          facet_wrap(
+  ~ facet_group,
+  labeller = labeller(
+    facet_group = facet_labeller(input$facet)
+  )
+)
+        }
+      } +
+      theme_minimal(base_size = 14) +
+      theme(
+        panel.background  = element_rect(fill = "black", color = NA),
+        plot.background   = element_rect(fill = "black", color = NA),
+        legend.background = element_rect(fill = "black", color = NA),
+        panel.grid.major  = element_line(color = "grey20"),
+        panel.grid.minor  = element_blank(),
+        axis.text         = element_text(color = "white"),
+        axis.title        = element_text(color = "white"),
+        legend.text       = element_text(color = "white"),
+        legend.title      = element_text(color = "white"),
+        strip.text        = element_text(color = "white"),
+        plot.title        = element_text(color = "white", face = "bold", size = 13, hjust = 0.5),
+        plot.subtitle     = element_text(color = "white", size = 13, hjust = 0.5),
+        axis.text.x       = element_text(angle = 45, hjust = 1)
+      )
+  })
+}
+
+shinyApp(ui, server)
+
+```
