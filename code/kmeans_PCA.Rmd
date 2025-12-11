@@ -436,16 +436,17 @@ comb_data_cluster <- comb_data_cluster |>
     mutate(
       across(
         c(
-          asia_influence, china_harm, china_deg_inf, china_inf_op, asia_future_inf
+          asia_influence, china_harm, china_deg_inf, china_inf_op, asia_future_inf, china_world_inf, way_of_life, aspect_power, foreign_immigration
         ),
-        ~ ifelse(.x %in% c(7, 8, 9), NA, .x)),
+        ~ ifelse(.x %in% c(7, 8, 9, 10), NA, .x)),
       across(
         c(asia_influence, model_development, china_dem, asia_future_inf),
         ~ ifelse(.x %in% c(16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 97, 98, 99), NA, .x)),
       across(model_development,
-             ~ ifelse(.x %in% c(8, 97, 98, 99), NA, .x)),
+             ~ ifelse(.x %in% c(7, 8, 10, 97, 98, 99), NA, .x)),
       across(country_problem1,
            ~ ifelse(.x %in% c(990, 997, 998, 998), NA, .x)))
+
 
 
 #writing data file to database
