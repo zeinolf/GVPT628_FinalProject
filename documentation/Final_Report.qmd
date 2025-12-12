@@ -46,7 +46,47 @@ library(rlang)
 library(bslib)
 ```
 
-```{r}
+![Source: https://en.people.cn/n3/2017/0126/c90000-9172067.html](images/FOREIGN201701261419000464992362047.jpg){fig-align="center"}
+
+The GitHub repository for this project can be found at <https://github.com/zeinolf/GVPT628_FinalProject>.
+
+## Introduction
+
+<br>
+
+## Methodology
+
+#### *Armed Conflict Location & Event Data (ACLED) Project*
+
+[ACLED](https://acleddata.com/) (Armed Conflict Location & Event Data) is a United States-based non-profit organization dedicated to monitoring global conflict and crisis trends. They collect real-time data on violence and demonstrations by triaging wide ranges of publicly available information (PAI) (including local news, national news, etc.) for synthesis into distinct events. With each event, they document variables such as actors, fatality estimates, locations, event-types, dates, and more. For an example of the types of events that ACLED collects, see Figure 1. Event-types are classified using strict definition-based inclusion criteria. To this date, ACLED is one of the most robust conflict-data collection projects, and is widely recognized as a reputable and reliable data source.
+
+**Figure 1.** ACLED-compiled conflict events in The Philippines over past month (as of December 12, 2025)
+
+![Source: https://acleddata.com/platform/explorer](images/Screen Shot 2025-12-12 at 2.19.03 PM.png){fig-align="center"}
+
+Conflict data from the ACLED repository can be viewed on their online dashboard tool for basic analysis as seen above. However, a look into conflict data from further back in time requires an API access token. This project specifically utilized the ACLED API in conjunction with the "acled.api" package in R to obtain conflict data for The Philippines and China. For more information regarding API access, see [API Documentation](https://acleddata.com/api-documentation/getting-started "API Documentation").
+
+For The Philippines, ACLED collection begins as far back as January 1, 2016. Likewise, ACLED collection on China began on January 1, 2018. To answer the research question, all ACLED event data that occurred in The Philippines and China from their respective starting collection date until October 11, 2021 was pulled via the ACLED API. This specific end date was chosen in order to line up directly with the last day of administered surveying for the Asian Barometer Wave 6 questionnaire. Data from each respective API query was subsequently cleaned and reformatted for easier use. Variables kept included event_date, actor, location, event_type, disorder_type, and fatalities, among others. The Philippines data was specifically filtered for event notes or actors that contained mentions to "china", "chinese", "south china sea", or "islands". Likewise, the China data was specifically filtered for event notes or actors that contained mentions to "philippines", "filipino", "south china sea", or "islands". After reduction, the data was bound together and written into a SQLite database. This final database ultimately contained 47 distinct events that involved some level of conflict between Filipino and Chinese actors.
+
+The code that what used to pull the data from the ACLED API for this project can be found [here](https://github.com/zeinolf/GVPT628_FinalProject/blob/main/code/data_pull%2Bcleaning.Rmd). The specific data that was stored using this API pull for use in this report can be found [here.](https://github.com/zeinolf/GVPT628_FinalProject/blob/main/data/acled_data.db)
+
+<br>
+
+#### *Asian Barometer*
+
+[The Asian Barometer Survey](https://asianbarometer.org/index) (ABS) is a public opinion survey project that captures the general attitudes of individuals living across Asia. Ultimately, the project aims to generate a region-wide base of scientifically reliable public opinion data on issues such as political values, democracy, the economy, etc. It was first established in 1971 by Fu Hu, Professor Emeritus of the Department of Political Science at National Taiwan University and Academician of Academia Sinica. It is now housed at the Fu Hu Center for East Asia Studies and works in collaboration with other notable "barometer" organizations around the world. Six waves of polling have occurred since 2001, with the organization currently administering its seventh wave as of late 2025.
+
+Although the ABS project does not have a working API, they allow researchers and scholars to download their data at request. The data release form can be found [here](https://asianbarometer.org/datar?page=d10). This indiviudal project specifically utilized data from Waves 3, 4, 5, and 6 of the ABS Philippines survey. Waves 1 and 2 were excluded as questions regarding attitudes towards China were not introduced until Wave 3. Each wave contains a sample of 1,200 Filipino respondents that are collectively statistically representative of the entire population of the Philippines.
+
+After each wave was read into R, a specific set of variables/questions were sub-selected for analysis. These included demographics such as gender, education, locality type, and age, as well as attitude-related variables ("psychographics") that asked respondents questions related to their attitudes on China. Each wave required certain variables to be recoded and/or rescaled, as question numbers and scales often changed from wave to wave. Once reformatted, each sub-selected and cleaned wave dataset was written into a SQLite database for replicability purposes. All waves were then bound together and further cleaned to recode non-response answers (e.g., "I don't know", "Refused to answer", etc.) as N/A values. With four different waves of 1,200 respondent datapoints, the final cleaned ABS data file contained 4800 rows of responses acoss 20 variables (that also include more administrative variables such as an identification number). This final ABS dataset was then written into a SQLite database for use in this report.
+
+All raw ABS wave files and questionnaires can be found in the "W" folders [here](https://github.com/zeinolf/GVPT628_FinalProject/tree/main/data). The code that what used to load and clean the ABS data for this project can be found [here](https://github.com/zeinolf/GVPT628_FinalProject/blob/main/code/data_pull%2Bcleaning.Rmd). The resulting data files for the cleaned ABS data that were used for use in this report can be found [here](https://github.com/zeinolf/GVPT628_FinalProject/tree/main/data).
+
+<br>
+
+## ACLED Analysis
+
+```{r, echo=FALSE, warning = FALSE}
 con <- dbConnect(SQLite(), "../data/acled_data.db")
 acled_data <- dbReadTable(con, "acled_data.db")
 dbDisconnect(con)
@@ -72,10 +112,10 @@ acled_data_c |>
     ) +
   theme_minimal(base_size = 13) +
   theme(
-    panel.background  = element_rect(fill = "black", color = NA),
-    plot.background   = element_rect(fill = "black", color = NA),
-    legend.background = element_rect(fill = "black", color = NA),
-    panel.grid.major  = element_line(color = "grey20"),
+    panel.background  = element_rect(fill = "#222222", color = NA),
+    plot.background   = element_rect(fill = "#222222", color = NA),
+    legend.background = element_rect(fill = "#222222", color = NA),
+    panel.grid.major  = element_line(color = "grey"),
     panel.grid.minor  = element_blank(),
     axis.text         = element_text(color = "white"),
     axis.title        = element_text(color = "white"),
@@ -90,7 +130,19 @@ acled_data_c |>
 #ggsave("../visualizations/acled_event_time.png")
 ```
 
-```{r}
+<br>
+
+## Comparison & Further Analysis
+
+<br>
+
+## Comparison & Further Analysis
+
+<br>
+
+## Discussion
+
+```{r, echo=FALSE, warning = FALSE}
 con <- dbConnect(SQLite(), "../data/asia_final_cluster.db")
 asia_final_cluster <- dbReadTable(con, "asia_final_cluster.db")
 dbDisconnect(con)
@@ -153,10 +205,10 @@ ggplot(
   ) +
   theme_minimal(base_size = 11) +
   theme(
-    panel.background  = element_rect(fill = "black", color = NA),
-    plot.background   = element_rect(fill = "black", color = NA),
-    legend.background = element_rect(fill = "black", color = NA),
-    panel.grid.major  = element_line(color = "grey20"),
+    panel.background  = element_rect(fill = "#222222", color = NA),
+    plot.background   = element_rect(fill = "#222222", color = NA),
+    legend.background = element_rect(fill = "#222222", color = NA),
+    panel.grid.major  = element_line(color = "grey"),
     panel.grid.minor  = element_blank(),
     axis.text         = element_text(color = "white"),
     axis.title        = element_text(color = "white"),
@@ -166,15 +218,13 @@ ggplot(
     plot.title        = element_text(color = "white", face = "bold", size = 13, hjust = 0.5),
     plot.subtitle     = element_text(color = "white", size = 13, hjust = 0.5),
     axis.text.x       = element_text(size = 5, angle = 45, hjust = 1),
-    plot.margin = margin(40, 40, 40, 40),
-    panel.spacing = unit(2, "cm")
   )+
   coord_polar(clip = "off")
 
 #ggsave("../visualizations/attitude_radar.png")
 ```
 
-```{r}
+```{r, echo=FALSE, warning = FALSE}
 con <- dbConnect(SQLite(), "../data/pca_combined.db") 
 pca_combined<- dbReadTable(con, "pca_combined.db") 
 dbDisconnect(con)
@@ -202,10 +252,24 @@ ggplot(cor_PC_att_df, aes(x = col_var, y = row_var, fill = correlation)) +
     fill = "r"
   ) +
   theme_minimal(base_size = 12) +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  theme(
+    panel.background  = element_rect(fill = "#222222", color = NA),
+    plot.background   = element_rect(fill = "#222222", color = NA),
+    legend.background = element_rect(fill = "#222222", color = NA),
+    panel.grid.major  = element_line(color = "grey"),
+    panel.grid.minor  = element_blank(),
+    axis.text         = element_text(color = "white"),
+    axis.title        = element_text(color = "white"),
+    legend.text       = element_text(color = "white"),
+    legend.title      = element_text(color = "white"),
+    strip.text        = element_text(color = "white"),
+    plot.title        = element_text(color = "white", face = "bold", size = 13, hjust = 0.5),
+    plot.subtitle     = element_text(color = "white", size = 13, hjust = 0.5),
+    axis.text.x       = element_text(angle = 45)
+  )
 ```
 
-```{r}
+```{r, echo=FALSE, warning = FALSE}
 ggplot(pca_combined, aes(x = PC1, y = PC2, color = cluster, shape = wave)) +
   geom_point(alpha = 0.7) +
   labs(
@@ -217,10 +281,10 @@ ggplot(pca_combined, aes(x = PC1, y = PC2, color = cluster, shape = wave)) +
   ) +
   theme_minimal(base_size = 13) +
   theme(
-    panel.background  = element_rect(fill = "black", color = NA),
-    plot.background   = element_rect(fill = "black", color = NA),
-    legend.background = element_rect(fill = "black", color = NA),
-    panel.grid.major  = element_line(color = "grey20"),
+    panel.background  = element_rect(fill = "#222222", color = NA),
+    plot.background   = element_rect(fill = "#222222", color = NA),
+    legend.background = element_rect(fill = "#222222", color = NA),
+    panel.grid.major  = element_line(color = "grey"),
     panel.grid.minor  = element_blank(),
     axis.text         = element_text(color = "white"),
     axis.title        = element_text(color = "white"),
@@ -236,7 +300,7 @@ ggplot(pca_combined, aes(x = PC1, y = PC2, color = cluster, shape = wave)) +
   )
 ```
 
-```{r}
+```{r, echo=FALSE, warning = FALSE}
 ggplot(pca_combined, aes(x = region, y = PC1)) +
   stat_summary(fun = mean, geom = "point") +
   stat_summary(fun.data = mean_cl_normal, geom = "errorbar", width = 0.2) +
@@ -246,7 +310,21 @@ ggplot(pca_combined, aes(x = region, y = PC1)) +
     y = "Mean PC1"
   ) +
   theme_minimal(base_size = 12) +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  theme(
+    panel.background  = element_rect(fill = "#222222", color = NA),
+    plot.background   = element_rect(fill = "#222222", color = NA),
+    legend.background = element_rect(fill = "#222222", color = NA),
+    panel.grid.major  = element_line(color = "grey"),
+    panel.grid.minor  = element_blank(),
+    axis.text         = element_text(color = "white"),
+    axis.title        = element_text(color = "white"),
+    legend.text       = element_text(color = "white"),
+    legend.title      = element_text(color = "white"),
+    strip.text        = element_text(color = "white"),
+    plot.title        = element_text(color = "white", face = "bold", size = 13, hjust = 0.5),
+    plot.subtitle     = element_text(color = "white", size = 13, hjust = 0.5),
+    axis.text.x       = element_text(angle = 45)
+  )
 ```
 
 <iframe src="https://zeinolf.shinyapps.io/gvpt628_finalproject/" width="145%" height="900px" style="border:none;">
