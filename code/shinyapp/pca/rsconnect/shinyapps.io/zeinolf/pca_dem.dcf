@@ -1,0 +1,12 @@
+name: pca_dem
+title: pca_dem
+username: zeinolf
+account: zeinolf
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 16311765
+bundleId: 11322132
+url: https://zeinolf.shinyapps.io/pca_dem/
+version: 1
+asMultiple: FALSE
+asStatic: FALSE
