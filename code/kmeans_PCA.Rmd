@@ -385,10 +385,10 @@ ggplot(wss6_df, aes(x = k, y = wss)) +
   ) +
   theme_minimal(base_size = 14) +
   theme(
-    panel.background  = element_rect(fill = "black", color = NA),
-    plot.background   = element_rect(fill = "black", color = NA),
-    legend.background = element_rect(fill = "black", color = NA),
-    panel.grid.major  = element_line(color = "grey20"),
+    panel.background  = element_rect(fill = "#222222", color = NA),
+    plot.background   = element_rect(fill = "#222222", color = NA),
+    legend.background = element_rect(fill = "#222222", color = NA),
+    panel.grid.major  = element_line(color = "grey"),
     panel.grid.minor  = element_blank(),
     axis.text         = element_text(color = "white"),
     axis.title        = element_text(color = "white"),
@@ -448,13 +448,10 @@ comb_data_cluster <- comb_data_cluster |>
            ~ ifelse(.x %in% c(990, 997, 998, 998), NA, .x)))
 
 
-
 #writing data file to database
 con <- dbConnect(SQLite(), "../data/asia_final_cluster.db")
 dbWriteTable(con, "asia_final_cluster.db", comb_data_cluster , overwrite = TRUE)
 dbDisconnect(con)
-
-asia_final_cluster <- comb_data_cluster
 
 ```
 
