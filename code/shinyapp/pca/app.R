@@ -151,11 +151,11 @@ server <- function(input, output, session) {
     
     #the actual plot
     ggplot(summ, aes(x = x, y = mean)) +
-      geom_point(size = 2, color = "#FF6B6B") +
+      geom_point(size = 4, color = "#FF6B6B") +
       geom_errorbar(
         aes(ymin = ymin, ymax = ymax),
         width = 0.2,
-        linewidth = 0.9,
+        linewidth = 2,
         color = "#FF6B6B"
       ) +
       labs(
