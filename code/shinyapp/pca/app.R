@@ -12,6 +12,7 @@ library(bslib)
 pca_path <- file.path(getwd(), "pca_combined.db")
 stopifnot(file.exists(pca_path))
 con <- dbConnect(SQLite(), pca_path)
+print(dbGetQuery(con, "PRAGMA database_list;"))
 tables <- dbListTables(con)
 print(tables)
 table_to_read <- if ("pca_combined" %in% tables) "pca_combined" else tables[[1]]

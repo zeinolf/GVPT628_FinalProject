@@ -453,6 +453,8 @@ con <- dbConnect(SQLite(), "../data/asia_final_cluster.db")
 dbWriteTable(con, "asia_final_cluster.db", comb_data_cluster , overwrite = TRUE)
 dbDisconnect(con)
 
+asia_final_cluster <- comb_data_cluster
+
 ```
 
 
