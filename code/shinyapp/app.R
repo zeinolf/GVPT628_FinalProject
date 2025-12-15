@@ -8,11 +8,13 @@ library(DBI)
 library(RSQLite)
 library(bslib)
 
+#reading in cluster data
 con <- dbConnect(SQLite(), "asia_final_cluster.db")
 asia_final_cluster <- dbReadTable(con, "asia_final_cluster.db")
 dbDisconnect(con)
 
 
+#label variable choices for the drop down selector
 var_choices <- c(
   "China influence on our country"           = "china_inf_op",
   "China influence on world affairs"         = "china_world_inf",
@@ -28,6 +30,7 @@ var_choices <- c(
   "K-Means Clustering Group"                 = "cluster"
 )
 
+#labeling different demographic facets
 facet_choices <- c(
   "None (all respondents)" = "none",
   "Cluster"                = "cluster",
@@ -36,6 +39,7 @@ facet_choices <- c(
   "Locality level"         = "locality_level"
 )
 
+#labeling titles for each variable question
 var_titles <- list(
   way_of_life      = "Should our country defend our way of life or learn from others?",
   aspect_power     = "Which aspect of power do you think of when you refer to powerful countries?",
@@ -51,6 +55,7 @@ var_titles <- list(
   cluster          = "K-Means Clustering Group"
 )
 
+#labeling the responses to each question
 response_labels <- list(
   way_of_life = c(
     "1" = "Defend our way of life",
@@ -129,19 +134,16 @@ response_labels <- list(
   )
 )
 
-
+#labeling responses for demographic breakdowns
 facet_label_maps <- list(
-  
   gender = c(
     "1" = "Male",
     "2" = "Female"
   ),
-  
   cluster = c(
     "1" = "Cluster 1",
     "2" = "Cluster 2"
   ),
-  
   education = c(
     "1" = "No formal education",
     "2" = "Incomplete primary",
@@ -154,7 +156,6 @@ facet_label_maps <- list(
     "9" = "University completed",
     "10" = "Post-graduate degree"
   ),
-  
   locality_level = c(
     "1" = "Megacity (1M+ people)",
     "2" = "Major city (100k+)",
@@ -163,6 +164,7 @@ facet_label_maps <- list(
   )
 )
 
+#creating a functionthat will creating labels for each respective demographic facet
 facet_labeller <- function(facet_var) {
   function(value) {
     labels <- facet_label_maps[[facet_var]]
@@ -173,6 +175,7 @@ facet_labeller <- function(facet_var) {
   }
 }
 
+#creating a function that will creating labels for each respective attitude question response
 label_fun_for_var <- function(var) {
   function(x) {
     labs <- response_labels[[var]]
@@ -183,6 +186,7 @@ label_fun_for_var <- function(var) {
   }
 }
 
+#creating the GUI for the shiny app dashboard
 ui <- fluidPage(
   theme = bs_theme(
     bg = "#222222",
@@ -216,14 +220,13 @@ ui <- fluidPage(
   )
 )
 
-
+#function to create the whole shiny app dashboard with graph
 server <- function(input, output, session) {
   
   output$stackPlot <- renderPlot({
     var        <- input$var
     facet_var  <- input$facet
     
-    # Title
     plot_title <- var_titles[[var]]
     if (is.null(plot_title)) plot_title <- var
     
@@ -292,4 +295,5 @@ server <- function(input, output, session) {
   })
 }
 
+#deploy app
 shinyApp(ui, server)
